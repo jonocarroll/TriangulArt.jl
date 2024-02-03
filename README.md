@@ -29,6 +29,17 @@ bird = load("examples/bird_small.jpg")
 
 <img src="examples/bird_small.jpg" width="500">
 
+A "fast" version samples entirely randomly,and likely produces poor results
+
+```
+triangulArt(bird, npts=500, fast=true)
+```
+
+![](examples/tri_bird_fast.svg)
+
+Instead, using entropy-based sampling is slower, but produces better results 
+with fewer points (default 100)
+
 ```
 triangulArt(bird)
 ```
@@ -51,6 +62,8 @@ triangulArt(everest)
 A small number of named options are available, including:
 
 * `npts=100`: change the number of points to be sampled from the entropy
+* `fast=false`: use a "fast" algorithm selecting points randomly, or a "slow" 
+entropy-based algorithm
 * `refine=false`: use the `DelaunayTriangulation` `refine` method to add more 
 triangles where possible
 * `debug=false`: draw the sampled points and edges explicitly

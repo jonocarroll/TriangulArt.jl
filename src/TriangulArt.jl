@@ -17,10 +17,10 @@ function __init__()
     copy!(skimage, pyimport("skimage"))
 end
 
-function edge_points(image,
-    length_scale=200,
-    n_horizontal_points=0,
-    n_vertical_points=0,
+function edge_points(image::Array{RGB{N0f8},3},
+    length_scale::Integer=200,
+    n_horizontal_points::Integer=0,
+    n_vertical_points::Integer=0,
 )
     ymax, xmax = size(image)[1:2]
     if n_horizontal_points == 0
@@ -47,12 +47,12 @@ function edge_points(image,
     unique(res, dims=1)
 end
 
-function generate_uniform_random_points(image, n_points=100)
+function generate_uniform_random_points(image::Matrix{RGB{N0f8}}, n_points::Integer=100)
     ymax, xmax = size(image)[1:2]
     rand(n_points, 2) .* [xmax ymax]
 end
 
-function generate_weighted_points(image, n_points=100)
+function generate_weighted_points(image::Matrix{RGB{N0f8}}, n_points::Integer=100)
     im1 = Gray.(image) * 255 |> x -> x .|> UInt8
     xsize, ysize = size(im1)
     length_scale = sqrt(xsize * ysize / n_points)
@@ -81,22 +81,50 @@ function generate_weighted_points(image, n_points=100)
     unique(epts, dims=1)
 end
 
-function which_tri(trivec, x, y)
+function which_tri(trivec::Vector{Vector{Vector{Float64}}}, x::Integer, y::Integer)
     findfirst(z -> 1 == inpolygon((x, y), trivec[z]), 1:length(trivec))
 end
 
+"""
+    triangulArt(
+        image::Matrix{RGB{N0f8}};
+        npts::Integer=100,
+        fast::Bool=false,
+        refine::Bool=false,
+        debug::Bool=false,
+        showimage::Bool=true
+    )
+
+Create an artistic Delaunay Triangulation from an image
+
+# Arguments
+- `image::Matrix{RGB{N0f8}}`: an image loaded via `FileIO::load()`
+- `npts::Integer=100`: the number of triangle vertices to create 
+- `fast::Bool=false`: if `true`, use random sampling, otherwise use the local entropy to select the vertices
+- `refine::Bool=false`: use `DelaunayTriangulation::refine()` to refine the vertices
+- `debug::Bool=false`: use debug mode; plot the triangle vertices and edges
+- `showimage::Bool=false`: in debug mode, plot a grayscale version of the original image beneath the points
+
+"""
 function triangulArt(
-    image;
-    npts=100,
-    refine=false,
-    debug=false,
-    showimage=true
+    image::Matrix{RGB{N0f8}};
+    npts::Integer=100,
+    fast::Bool=false,
+    refine::Bool=false,
+    debug::Bool=false,
+    showimage::Bool=true
 )
     orig_image = copy(image)
+    # use a 3D representation
     image = image[:, :, :]
-    points = generate_weighted_points(orig_image, npts)
+    if fast
+        points = generate_uniform_random_points(orig_image, npts)
+    else
+        points = generate_weighted_points(orig_image, npts)
+    end
     boundary_points = edge_points(image)
     all_points = vcat(points, boundary_points)
+
     rng = StableRNG(2)
     all_points = unique(collect(reinterpret(reshape, Tuple{Float64,Float64}, all_points')), dims=1)
     tri = triangulate(all_points; rng)
@@ -104,11 +132,13 @@ function triangulArt(
         refine!(tri, max_area=prod(size(image)) / 200, min_area=prod(size(image)) / (2000))
     end
 
+    # change from color, width, height to height, width, color
     img_CHW = channelview(image)
     img_HWC = permutedims(img_CHW, (3, 2, 1, 4)) # 2 * 2 * 3
+    # correctly order height, width
     img_HWC = permutedims(img_HWC[:, :, :, 1], (2, 1, 3))
 
-    trivec = []
+    trivec = Vector{Vector{Vector{Float64}}}()
     for T in each_triangle(tri)
         i, j, k = indices(T)
         p, q, r = get_point(tri, i, j, k)
@@ -118,7 +148,7 @@ function triangulArt(
             [first(p), last(p)]])
     end
 
-    locs = []
+    locs = Vector{Tuple{Integer,Integer,Vector{N0f8},Union{Nothing,Integer}}}()
     sizey, sizex = size(img_HWC)
     for x in 1:10:sizex
         for y in 1:10:sizey
