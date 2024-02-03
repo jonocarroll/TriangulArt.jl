@@ -4,7 +4,7 @@
 
 Transform an image into to a low-resolution artistic version using Delaunay Triangulation.
 
-This package is a learning exercise for me. YMMV.
+This package is a learning exercise for me. YMMV. Some behind-the-scenes details are in [this blog post](https://jcarroll.com.au/2024/02/04/my-first-julia-package-triangulart-jl/).
 
 This began life as a Julia port of 
 [this Python-based script](https://www.degeneratestate.org/posts/2017/May/24/images-to-triangles/) 
