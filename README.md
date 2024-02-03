@@ -77,26 +77,26 @@ triangulArt(bird, npts=500)
 ![](examples/tri_bird_small_500.svg)
 
 ```
-triangulArt(bird, ntps=100, refine=true)
+triangulArt(bird, npts=100, refine=true)
 ```
 
 ![](examples/tri_bird_small_100_refine.svg)
 
 ```
-triangulArt(bird, ntps=100, debug=true)
+triangulArt(bird, npts=100, debug=true)
 ```
 
 ![](examples/tri_bird_small_debug.svg)
 
 ```
-triangulArt(bird, ntps=100, debug=true, showimage=false)
+triangulArt(bird, npts=100, debug=true, showimage=false)
 ```
 
 ![](examples/tri_bird_small_debug_noimage.svg)
 
 ## Method
 
-Following the [the original script](https://www.degeneratestate.org/posts/2017/May/24/images-to-triangles/), 
+Following the [the original script described here](https://www.degeneratestate.org/posts/2017/May/24/images-to-triangles/), 
 this package first generates points spaced evenly around the border.
 
 Rather than randomly selecting points around the image, especially where there are 
@@ -135,6 +135,8 @@ on the combined edge points and maximum-entropy points. If requested, this is
 The triangle to which each pixel belongs is calculated, then the average colour 
 of each triangle is determined. The triangles are then drawn and filled with the 
 respective average colour.
+
+The source for the python version is [forked here](https://github.com/jonocarroll/images-to-triangles) where I have made minor tweaks to bring it back up to date with current package versions.
 
 ## Limitations / Known Issues
 
