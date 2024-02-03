@@ -92,7 +92,8 @@ end
         fast::Bool=false,
         refine::Bool=false,
         debug::Bool=false,
-        showimage::Bool=true
+        showimage::Bool=false,
+        showimagecol::Bool=false
     )
 
 Create an artistic Delaunay Triangulation from an image
@@ -103,7 +104,8 @@ Create an artistic Delaunay Triangulation from an image
 - `fast::Bool=false`: if `true`, use random sampling, otherwise use the local entropy to select the vertices
 - `refine::Bool=false`: use `DelaunayTriangulation::refine()` to refine the vertices
 - `debug::Bool=false`: use debug mode; plot the triangle vertices and edges
-- `showimage::Bool=false`: in debug mode, plot a grayscale version of the original image beneath the points
+- `showimage::Bool=false`: plot a grayscale version of the original image beneath the points
+- `showimagecol::Bool=false`: plot a colour version of the original image beneath the points
 
 """
 function triangulArt(
@@ -112,7 +114,8 @@ function triangulArt(
     fast::Bool=false,
     refine::Bool=false,
     debug::Bool=false,
-    showimage::Bool=true
+    showimage::Bool=false,
+    showimagecol::Bool=false
 )
     orig_image = copy(image)
     # use a 3D representation
@@ -169,6 +172,8 @@ function triangulArt(
 
     if showimage
         pl = plot(Gray.(img_HWC[:, :, 1, 1]), showaxis=false, xlim=(1, sizex), ylim=(1, sizey), aspect_ratio=:auto)
+    elseif showimagecol
+        pl = plot(orig_image, showaxis=false, xlim=(1, sizex), ylim=(1, sizey), aspect_ratio=:auto)
     else
         pl = plot(showaxis=false, yflip=true, xlim=(1, sizex), ylim=(1, sizey))
     end

@@ -69,6 +69,8 @@ triangles where possible
 * `debug=false`: draw the sampled points and edges explicitly
 * `showimage=true`: show a grayscale version of the original image beneath the 
 debug points
+* `showimagecol=true`: show a colour version of the original image beneath the 
+debug points
 
 ```
 triangulArt(bird, npts=500)
