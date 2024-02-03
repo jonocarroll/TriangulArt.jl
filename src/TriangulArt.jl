@@ -60,7 +60,7 @@ function generate_weighted_points(image::Matrix{RGB{N0f8}}, n_points::Integer=10
     radius = floor(Int, length_scale)
 
     amp = 3
-    entropy_width = 20
+    entropy_width = 0.2 * length_scale
     im2 = skimage.filters.rank.entropy(im1, skimage.morphology.disk(entropy_width))
 
     epts = Array{Int}(undef, (n_points, 2))
@@ -68,12 +68,12 @@ function generate_weighted_points(image::Matrix{RGB{N0f8}}, n_points::Integer=10
         maxpos = last(findmax(im2))
         x, y = getindex(maxpos, 1), getindex(maxpos, 2)
         epts[n, :] = [y x]
-        for i in (x-radius):(x+radius)
-            for j in (y-radius):(y+radius)
+        for i in (x-2radius):(x+2radius)
+            for j in (y-2radius):(y+2radius)
                 if !checkbounds(Bool, im2, i, j)
                     continue
                 end
-                im2[i, j] = im2[i, j] - amp * exp(-sqrt((i - x)^2 + (j - y)^2) / 2sigma^2)
+                im2[i, j] = im2[i, j] - amp * exp(-((i - x)^2 + (j - y)^2) / 2sigma^2)
             end
         end
     end
