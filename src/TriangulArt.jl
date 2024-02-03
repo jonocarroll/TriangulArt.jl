@@ -105,7 +105,7 @@ Create an artistic Delaunay Triangulation from an image
 - `refine::Bool=false`: use `DelaunayTriangulation::refine()` to refine the vertices
 - `debug::Bool=false`: use debug mode; plot the triangle vertices and edges
 - `showimage::Bool=false`: plot a grayscale version of the original image beneath the points
-- `showimagecol::Bool=false`: plot a colour version of the original image beneath the points
+- `showimagecol::Bool=false`: plot a colour version of the original image beneath the points. Setting this helps hide the triangle edges.
 
 """
 function triangulArt(
@@ -115,7 +115,7 @@ function triangulArt(
     refine::Bool=false,
     debug::Bool=false,
     showimage::Bool=false,
-    showimagecol::Bool=false
+    showimagecol::Bool=true
 )
     orig_image = copy(image)
     # use a 3D representation
