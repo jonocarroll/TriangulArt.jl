@@ -86,8 +86,8 @@ function which_tri(trivec, x, y)
 end
 
 function triangulArt(
-    image,
-    npts=100;
+    image;
+    npts=100,
     refine=false,
     debug=false,
     showimage=true
@@ -138,10 +138,8 @@ function triangulArt(
     end
 
     if showimage
-        # pl = plot(Gray.(img_HWC[:, :, 1, 1]), showaxis=false, xlim=(1, sizex), ylim=(1, sizey), bottom_margin=0mm, margin=0mm, aspect_ratio=:auto)
         pl = plot(Gray.(img_HWC[:, :, 1, 1]), showaxis=false, xlim=(1, sizex), ylim=(1, sizey), aspect_ratio=:auto)
     else
-        # pl = plot(showaxis=false, yflip=true, xlim=(1, sizex), ylim=(1, sizey), bottom_margin=0mm)
         pl = plot(showaxis=false, yflip=true, xlim=(1, sizex), ylim=(1, sizey))
     end
     if debug
