@@ -1,7 +1,6 @@
 module TriangulArt
 
 using Images
-using ImageView
 using FileIO
 using StatsBase
 using DelaunayTriangulation
