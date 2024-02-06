@@ -16,6 +16,9 @@ by Iain Barr, but will likely diverge as time goes on.
 julia> Pkg.add("https://github.com/jonocarroll/TriangulArt.jl")
 ```
 
+> [!IMPORTANT]
+> TriangulArt requires the python package `scikit-image` be installed and available to `PyCall`.
+
 ### Usage
 
 To use this package, `load` an image then call `triangulArt()` on it
@@ -152,9 +155,9 @@ is expensive.
 * To speed up the processing, only every 10th pixel is used to determine the 
 average colour of the triangle - this may fail to identify an entire triangle.
 
-* CI - I generated this package in VSCode using `PkgTemplates` and it is the 
+* ~~CI - I generated this package in VSCode using `PkgTemplates` and it is the 
 first Julia package I've built. CI failed immediately, so I've probably done 
-something wrong.
+something wrong.~~
 
 * I am still somewhat of a beginner in Julia, so there are probably many places 
 in which improvements can be made - feel free to suggest them!
