@@ -1,7 +1,7 @@
 name = "TriangulArt"
 uuid = "4e825928-4f37-4da1-b333-216cc9c54310"
 authors = ["Jonathan Carroll"]
-version = "1.0.0-DEV"
+version = "1.0.1"
 
 [deps]
 DelaunayTriangulation = "927a84f5-c5f4-47a5-9785-b46e178433df"
