@@ -6,7 +6,6 @@ using StatsBase
 using DelaunayTriangulation
 using StableRNGs
 using Plots
-using PolygonOps
 
 using PyCall
 
@@ -76,12 +75,13 @@ function generate_weighted_points(image::Matrix{RGB{N0f8}}, n_points::Integer=10
             end
         end
     end
-
     unique(epts, dims=1)
 end
 
-function which_tri(trivec::Vector{Vector{Vector{Float64}}}, x::Integer, y::Integer)
-    findfirst(z -> 1 == inpolygon((x, y), trivec[z]), 1:length(trivec))
+function which_tri(tri::Triangulation, x, y, k=0)
+    q = (float(x), float(y))
+    V = iszero(k) ? jump_and_march(tri, q) : jump_and_march(tri, q; k)
+    return DelaunayTriangulation.sort_triangle(V)
 end
 
 """
@@ -126,12 +126,11 @@ function triangulArt(
     end
     boundary_points = edge_points(image)
     all_points = vcat(points, boundary_points)
-
+    all_points = @views unique!(tuple.(all_points[:, 1], all_points[:, 2]))
     rng = StableRNG(2)
-    all_points = unique(collect(reinterpret(reshape, Tuple{Float64,Float64}, all_points')), dims=1)
     tri = triangulate(all_points; rng)
-    if (refine)
-        refine!(tri, max_area=prod(size(image)) / 200, min_area=prod(size(image)) / (2000))
+    if refine
+        refine!(tri, max_area=prod(size(image)) / 200, min_area=prod(size(image)) / (2000); rng)
     end
 
     # change from color, width, height to height, width, color
@@ -140,27 +139,20 @@ function triangulArt(
     # correctly order height, width
     img_HWC = permutedims(img_HWC[:, :, :, 1], (2, 1, 3))
 
-    trivec = Vector{Vector{Vector{Float64}}}()
-    for T in each_triangle(tri)
-        i, j, k = indices(T)
-        p, q, r = get_point(tri, i, j, k)
-        push!(trivec, [[first(p), last(p)],
-            [first(q), last(q)],
-            [first(r), last(r)],
-            [first(p), last(p)]])
-    end
-
-    locs = Vector{Tuple{Integer,Integer,Vector{N0f8},Union{Nothing,Integer}}}()
+    locs = Vector{Tuple{Int,Int,Vector{N0f8},NTuple{3,Int}}}()
     sizey, sizex = size(img_HWC)
+    k = 0
     for x in 1:10:sizex
         for y in 1:10:sizey
-            push!(locs, (x, y, img_HWC[y, x, :], which_tri(trivec, x, y)))
+            V = which_tri(tri, x, y, k)
+            k = rand(rng, triangle_vertices(V)) # just take some random vertex to start from 
+            push!(locs, (x, y, img_HWC[y, x, :], V))
         end
     end
     # average colours
-    at = map(z -> z[4], locs)
+    at = getindex.(locs, 4)
     ind = map(elem -> findall(isequal(elem), at), unique(at))
-    cols = Dict()
+    cols = Dict{NTuple{3,Int},NTuple{3,Float32}}()
     for i in ind
         tr = locs[i][1][4]
         r = map(e -> e[3][1], locs[i])
@@ -170,28 +162,25 @@ function triangulArt(
     end
 
     if showimage
-        pl = plot(Gray.(img_HWC[:, :, 1, 1]), showaxis=false, xlim=(1, sizex), ylim=(1, sizey), aspect_ratio=:auto)
+        @views pl = plot(Gray.(img_HWC[:, :, 1, 1]), showaxis=false, xlim=(1, sizex), ylim=(1, sizey), aspect_ratio=:auto)
     elseif showimagecol
         pl = plot(orig_image, showaxis=false, xlim=(1, sizex), ylim=(1, sizey), aspect_ratio=:auto)
     else
         pl = plot(showaxis=false, yflip=true, xlim=(1, sizex), ylim=(1, sizey))
     end
-    if debug
+    @views if debug
         scatter!(pl, boundary_points[:, 1], boundary_points[:, 2], markercolor=:blue, legend=false)
         scatter!(pl, points[:, 1], points[:, 2], markercolor=:red, legend=false)
     end
 
-    for ii in eachindex(trivec)
-        pts = trivec[ii]
-        xs = first.(pts)
-        ys = last.(pts)
-        if (haskey(cols, ii))
-            cr, cg, cb = cols[ii]
-        else
-            cr, cg, cb = 0, 0, 0
-        end
+    for V in each_solid_triangle(tri)
+        V = DelaunayTriangulation.sort_triangle(V) # note that we sorted earlier. This ensures that (1) all triangulations are represented in the same order (e.g. (3, 1, 2) and (1, 2, 3) both go to (1, 2, 3)), and that (2) the keys in the Dict only store the triangle once
+        u, v, w = triangle_vertices(V)
+        p, q, r = get_point(tri, u, v, w)
+        xs = [getx(p), getx(q), getx(r), getx(p)]
+        ys = [gety(p), gety(q), gety(r), gety(p)]
+        cr, cg, cb = get(cols, V, (0.0f0, 0.0f0, 0.0f0))
         tricol = RGBA(cr, cg, cb, 1.0)
-
         if debug
             plot!(pl, xs, ys, linecolor=:black, legend=false)
         else
