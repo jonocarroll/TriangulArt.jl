@@ -6,6 +6,7 @@ using StatsBase
 using DelaunayTriangulation
 using StableRNGs
 using Plots
+import Colors: clamp01
 
 using PyCall
 
@@ -15,7 +16,7 @@ function __init__()
     copy!(skimage, pyimport("skimage"))
 end
 
-function edge_points(image::Array{RGB{N0f8},3},
+function edge_points(image::Matrix{RGB{N0f8}},
     length_scale::Integer=200,
     n_horizontal_points::Integer=0,
     n_vertical_points::Integer=0,
@@ -52,14 +53,14 @@ end
 
 function generate_weighted_points(image::Matrix{RGB{N0f8}}, n_points::Integer=100)
     im1 = Gray.(image) * 255 |> x -> x .|> UInt8
-    xsize, ysize = size(im1)
+    ysize, xsize = size(im1) 
     length_scale = sqrt(xsize * ysize / n_points)
     sigma = 0.3 * length_scale
     radius = floor(Int, length_scale)
 
     amp = 3
     entropy_width = 0.2 * length_scale
-    im2 = skimage.filters.rank.entropy(im1, skimage.morphology.disk(entropy_width))
+    im2 = Float64.(skimage.filters.rank.entropy(im1, skimage.morphology.disk(entropy_width)))
 
     epts = Array{Int}(undef, (n_points, 2))
     for n in 1:n_points
@@ -90,9 +91,7 @@ end
         npts::Integer=100,
         fast::Bool=false,
         refine::Bool=false,
-        debug::Bool=false,
-        showimage::Bool=false,
-        showimagecol::Bool=false
+        debug::Bool=false
     )
 
 Create an artistic Delaunay Triangulation from an image
@@ -102,9 +101,7 @@ Create an artistic Delaunay Triangulation from an image
 - `npts::Integer=100`: the number of triangle vertices to create 
 - `fast::Bool=false`: if `true`, use random sampling, otherwise use the local entropy to select the vertices
 - `refine::Bool=false`: use `DelaunayTriangulation::refine()` to refine the vertices
-- `debug::Bool=false`: use debug mode; plot the triangle vertices and edges
-- `showimage::Bool=false`: plot a grayscale version of the original image beneath the points
-- `showimagecol::Bool=false`: plot a colour version of the original image beneath the points. Setting this helps hide the triangle edges.
+- `debug::Bool=false`: use debug mode; overlay the triangle vertices and edges on the output
 
 """
 function triangulArt(
@@ -112,13 +109,16 @@ function triangulArt(
     npts::Integer=100,
     fast::Bool=false,
     refine::Bool=false,
-    debug::Bool=false,
-    showimage::Bool=false,
-    showimagecol::Bool=true
+    debug::Bool=false
 )
+
+    @info "triangulArt called" npts=npts
+
     orig_image = copy(image)
+    orig_image = map(Images.clamp01nan, orig_image)
+
     # use a 3D representation
-    image = image[:, :, :]
+    # image = image[:, :, :]
     if fast
         points = generate_uniform_random_points(orig_image, npts)
     else
@@ -133,63 +133,62 @@ function triangulArt(
         refine!(tri, max_area=prod(size(image)) / 200, min_area=prod(size(image)) / (2000); rng)
     end
 
-    # change from color, width, height to height, width, color
+    # prepare image array used for colouring
     img_CHW = channelview(image)
-    img_HWC = permutedims(img_CHW, (3, 2, 1, 4)) # 2 * 2 * 3
-    # correctly order height, width
-    img_HWC = permutedims(img_HWC[:, :, :, 1], (2, 1, 3))
+    img_HWC = permutedims(img_CHW, (2, 3, 1))
+    img_HWC = clamp01.(img_HWC)
+    sizey, sizex = size(img_HWC)          # height, width
 
-    locs = Vector{Tuple{Int,Int,Vector{N0f8},NTuple{3,Int}}}()
-    sizey, sizex = size(img_HWC)
-    k = 0
-    for x in 1:10:sizex
-        for y in 1:10:sizey
-            V = which_tri(tri, x, y, k)
-            k = rand(rng, triangle_vertices(V)) # just take some random vertex to start from 
-            push!(locs, (x, y, img_HWC[y, x, :], V))
-        end
-    end
-    # average colours
-    at = getindex.(locs, 4)
-    ind = map(elem -> findall(isequal(elem), at), unique(at))
-    cols = Dict{NTuple{3,Int},NTuple{3,Float32}}()
-    for i in ind
-        tr = locs[i][1][4]
-        r = map(e -> e[3][1], locs[i])
-        g = map(e -> e[3][2], locs[i])
-        b = map(e -> e[3][3], locs[i])
-        cols[tr] = (median(r), median(g), median(b))
+    # sample the image colour at the centroid of triangle (p, q, r)
+    function _centroid_colour(p, q, r)
+        cx = clamp(round(Int, (getx(p) + getx(q) + getx(r)) / 3), 1, sizex)
+        cy = clamp(round(Int, (gety(p) + gety(q) + gety(r)) / 3), 1, sizey)
+        RGB{Float32}(
+            clamp01(Float32(img_HWC[cy, cx, 1])),
+            clamp01(Float32(img_HWC[cy, cx, 2])),
+            clamp01(Float32(img_HWC[cy, cx, 3]))
+        )
     end
 
-    if showimage
-        @views pl = plot(Gray.(img_HWC[:, :, 1, 1]), showaxis=false, xlim=(1, sizex), ylim=(1, sizey), aspect_ratio=:auto)
-    elseif showimagecol
-        pl = plot(orig_image, showaxis=false, xlim=(1, sizex), ylim=(1, sizey), aspect_ratio=:auto)
-    else
-        pl = plot(showaxis=false, yflip=true, xlim=(1, sizex), ylim=(1, sizey))
-    end
-    @views if debug
-        scatter!(pl, boundary_points[:, 1], boundary_points[:, 2], markercolor=:blue, legend=false)
-        scatter!(pl, points[:, 1], points[:, 2], markercolor=:red, legend=false)
-    end
-
-    for V in each_solid_triangle(tri)
-        V = DelaunayTriangulation.sort_triangle(V) # note that we sorted earlier. This ensures that (1) all triangulations are represented in the same order (e.g. (3, 1, 2) and (1, 2, 3) both go to (1, 2, 3)), and that (2) the keys in the Dict only store the triangle once
+    # build triangle list and pre-compute colours
+    tri_list = [DelaunayTriangulation.sort_triangle(V) for V in each_solid_triangle(tri)]
+    cols_list = [begin
         u, v, w = triangle_vertices(V)
         p, q, r = get_point(tri, u, v, w)
-        xs = [getx(p), getx(q), getx(r), getx(p)]
-        ys = [gety(p), gety(q), gety(r), gety(p)]
-        cr, cg, cb = get(cols, V, (0.0f0, 0.0f0, 0.0f0))
-        tricol = RGBA(cr, cg, cb, 1.0)
-        if debug
+        _centroid_colour(p, q, r)
+    end for V in tri_list]
+
+    # build triangle → colour lookup (keyed by sorted triangle)
+    tri_colors = Dict(V => c for (V, c) in zip(tri_list, cols_list))
+
+    # rasterize: for each output pixel find its containing triangle via
+    # jump-and-march, then look up the pre-computed colour
+    output = Matrix{RGB{Float32}}(undef, sizey, sizex)
+    for row in 1:sizey, col in 1:sizex
+        V = which_tri(tri, col, row)
+        output[row, col] = get(tri_colors, V,
+            RGB{Float32}(clamp01(Float32(img_HWC[row, col, 1])),
+                         clamp01(Float32(img_HWC[row, col, 2])),
+                         clamp01(Float32(img_HWC[row, col, 3]))))
+    end
+
+    pl = plot(output, showaxis=false, aspect_ratio=:auto)
+
+    if debug
+        scatter!(pl, boundary_points[:, 1], boundary_points[:, 2],
+                 markercolor=:blue, legend=false)
+        scatter!(pl, points[:, 1], points[:, 2], markercolor=:red,
+                 legend=false)
+        for V in tri_list
+            u, v, w = triangle_vertices(V)
+            p, q, r = get_point(tri, u, v, w)
+            xs = [getx(p), getx(q), getx(r), getx(p)]
+            ys = [gety(p), gety(q), gety(r), gety(p)]
             plot!(pl, xs, ys, linecolor=:black, legend=false)
-        else
-            plot!(pl, xs, ys, linewidth=0, linealpha=0, seriestype=:shape, fillcolor=tricol, legend=false)
         end
     end
 
     pl
-
 end
 
 export triangulArt
